@@ -1,3 +1,8 @@
+#INCLUDE "TOTVS.CH"
+#INCLUDE "XMLXFUN.CH"
+#INCLUDE "TBICONN.CH"
+#INCLUDE "FILEIO.CH"
+
 /*/{Protheus.doc} BuscaXML
 Consultar e baixar o arquivo XML da NFE.
 @type function
@@ -8,6 +13,7 @@ Consultar e baixar o arquivo XML da NFE.
 @return character, Texto do nome do arquivo
 /*/
 Static Function BuscaXML( lManual, cDir, cChave )
+
 
 	Local nHndERP := AdvConnection()
 	Local cServer := "99.99.99.99"
