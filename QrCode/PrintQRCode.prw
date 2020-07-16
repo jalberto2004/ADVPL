@@ -1,13 +1,11 @@
-#Include "PROTHEUS.CH"
-#Include "RPTDEF.CH"
+#INCLUDE "PROTHEUS.CH"
+#INCLUDE "RPTDEF.CH"
 #INCLUDE "TBICONN.CH"
 
 // https://tdn.totvs.com/display/public/PROT/FWMsPrinter
 User Function PrintQRCode()
  
 	Local oPrinter
-	 
-	//PREPARE ENVIRONMENT EMPRESA "99" FILIAL "01"
 	 
 	oPrinter := FWMSPrinter():New('teste',6,.F.,,.T.,,,,,.F.)
 	oPrinter:Setup()
@@ -21,7 +19,5 @@ User Function PrintQRCode()
 	
 	FreeObj(oPrinter)
 	oPrinter := Nil
-	 
-	//RESET ENVIRONMENT
  
 Return
