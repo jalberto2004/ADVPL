@@ -6,6 +6,8 @@
 #INCLUDE "INKEY.CH"
 #INCLUDE "FILEIO.CH"
 
+
+
 /*/{Protheus.doc} SuperQry
 Montar uma tela para a digitação e execução de Comandos SQL ( Select, Update e Insert ).
 @type function
