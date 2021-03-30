@@ -93,18 +93,14 @@ User Function TRANSARQ()
 	If Len( aListC ) > 0
 		oList1:bLine:={||{If(aListC[oList1:nAt,01],oOk,oNo),aListC[oList1:nAt,2],Transform(aListC[oList1:nAt,3],"999,999,999,999"),DtoC(aListC[oList1:nAt,4]), aListC[oList1:nAt,5] } }
 	EndIf
-	cBlockHead := "{|u| OrdDados(oList1:ColPos,aListC,oList1) }"
-	bBlockHead := &cBlockHead
-	oList1:bHeaderClick := bBlockHead
+	oList1:bHeaderClick := {|u| OrdDados(oList1:ColPos,aListC,oList1) }
 	oList1:Refresh()
 
 	oList2:SetArray(aListD)
 	If Len( aListD ) > 0
 		oList2:bLine:={||{If(aListD[oList2:nAt,01],oOk,oNo),aListD[oList2:nAt,2],Transform(aListD[oList2:nAt,3],"999,999,999,999"),DtoC(aListD[oList2:nAt,4]), aListD[oList2:nAt,5] } }
 	EndIf
-	cBlockHead := "{|u| OrdDados(oList2:ColPos,aListD,oList2) }"
-	bBlockHead := &cBlockHead
-	oList2:bHeaderClick := bBlockHead
+	oList2:bHeaderClick := {|| OrdDados(oList2:ColPos,aListD,oList2) }
 	oList2:Refresh()
 
 	oBtnCS := tButton():New(040,253,' ---> ' ,oDlg,{|| AtuCopia(1)}   ,35,20,,,,.T.)
