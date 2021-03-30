@@ -3,10 +3,7 @@
 #INCLUDE "TOPCONN.CH"
 #INCLUDE "FWBROWSE.CH"
 #INCLUDE "AP5MAIL.CH"
-#INCLUDE "INKEY.CH"
 #INCLUDE "FILEIO.CH"
-
-
 
 /*/{Protheus.doc} SuperQry
 Montar uma tela para a digitação e execução de Comandos SQL ( Select, Update e Insert ).
@@ -18,18 +15,13 @@ Montar uma tela para a digitação e execução de Comandos SQL ( Select, Update e I
 User Function SuperQry()
 
     Local cSQL := ""
+    Local cLine := ""
     Local cLogErro := ""
-    Local cMensagem := ""
     Local cTipo := "Original"
-    Local aCoors := FWGetDialogSize()
-    Local aPastas := {}
-    Local aHeader := {}
     Local aTipos := {"Titulo","Original"}
-    Local oPanelConfig
-    Local oPanelAcoes
+    Local nHdl := 0
     Local oPanelResultado
     Local oPanelQuery
-    Local oLayer
     Local oDlg
     Local oFont := TFont():New( "Arial",0,-14,,.F.,0,,700,.F.,.F.,,,,,, )
     Local oMGSql
@@ -37,6 +29,22 @@ User Function SuperQry()
 
     Private oPanelMsg
     Private oGridResult
+    Private cArqUser := "super"+RetCodUsr()+".qry"
+
+    If File( cArqUser )
+        nHdl := FT_FUse( cArqUser )
+        If nHdl = -1
+            Alert( "Erro na abertura do arquivo ")
+        Else
+            FT_FGoTop()
+            While !FT_FEOF()
+                cLine  := FT_FReadLn()
+                cSQL += cLine + CRLF
+                FT_FSKIP()
+            End
+            FT_FUSE()
+        EndIf
+    EndIf
 
 	//**************************************************************
 	// Calcula as 2 dimensões, onde cada uma terá seus objetos      
@@ -78,7 +86,7 @@ User Function SuperQry()
     oPanelQuery := TGroup():New(oSizeSup:GetDimension("CONSULTA","LININI"),;
                                 oSizeSup:GetDimension("CONSULTA","COLINI"),;
                                 oSizeSup:GetDimension("CONSULTA","LINEND"),;
-                                oSizeSup:GetDimension("CONSULTA","COLEND"),'Consulta SQL',oDlg,,,.T.)
+                                oSizeSup:GetDimension("CONSULTA","COLEND"),'Comando SQL',oDlg,,,.T.)
     
     //****************************************************************************
     //Aqui está criando o Grupo onde será colocado o MultiGet para as Mensagens 
@@ -99,10 +107,10 @@ User Function SuperQry()
     //***********************************************
     //Aqui está criando os Botões/Atalhos das ações
     //***********************************************
-    SetKey( VK_F5, {|| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo ) } ) } )
+    SetKey( VK_F5, {|| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ) } ) } )
     TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+10,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
-                    "Executar SQL (F5)",oGgpOpcoes,{|u| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo ) } ) },50,12,,,,.T.,,"",,,,.F. )
+                    "Executar SQL (F5)",oGgpOpcoes,{|u| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ) } ) },50,12,,,,.T.,,"",,,,.F. )
 
 	TComboBox():New( oSizeSup:GetDimension("OPCOES","LININI")+30,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
@@ -125,7 +133,7 @@ User Function SuperQry()
     //Aqui está criando o MultiGet para a digitação do SQL
     //******************************************************
     oMGSql := tMultiget():new(oSizeSup:GetDimension("CONSULTA","LININI")+10/*Linha inicial*/,;
-                    oSizeSup:GetDimension("CONSULTA","COLINI")+05/*Coluna inicial*/,;
+                    oSizeSup:GetDimension("CONSULTA","COLINI")+5/*Coluna inicial*/,;
                     {| u | if( pCount() > 0, cSQL := u, cSQL )},oPanelQuery,;
                     oSizeSup:GetDimension("CONSULTA","XSIZE")-10/*Largura*/,;
                     oSizeSup:GetDimension("CONSULTA","YSIZE")-15/*Altura*/,oFont,,,,,.T./*lPixel*/,,,,,,.F./*lReadOnly*/,/*bValid*/,,,/*lNoBorder*/,.T./*lVScroll*/)
@@ -145,12 +153,16 @@ Return
 //********************************
 //Executar os comandos digitados
 //********************************
-Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo )
+Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo, nPosCursor )
 
     Local nQueryRet := 0 
     Local nX := 0
+    Local nHdl := 0
+    Local nPosIni := 0
+    Local nPosFim := 0
     Local oFont := TFont():New( "Tahoma",0,-14,,.F.,0,,700,.F.,.F.,,,,,, )
     Local cTRB := ""
+    Local cSqlDigit := cSql
     Local cErro := ""
     Local cCampo := ""
     Local cMensagem := ""
@@ -162,8 +174,29 @@ Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo )
     Local aSQL := {}
     Local oMGMensagem
 
-    If Empty( cSql )
+    If( Empty( cSql ) .Or. nPosCursor <= 0 )
         Return
+    EndIf
+
+    // Localiza o ; apos a posição do cursor
+    nPosFim := At( ";", cSql, nPosCursor )
+
+    If nPosFim > 0
+
+        // Pega todo o texto desde o inicio ate o ; apos a posição do cursor
+        cSql := SubStr( cSql, 1, nPosFim-1 )
+
+        // Pega a posicao do ULTIMO ; sendo que pode não existir
+        nPosIni := RAt( ";", cSql ) + 1
+
+    // Se não tem o ; apos o cursor, pega o ultimo ; localizado
+    Else
+        nPosIni := RAt( ";", cSql ) + 1
+    EndIf
+
+    If nPosIni > 0
+        // Pega somente o que deve ser executado
+        cSql := SubStr( cSql, nPosIni )
     EndIf
 
     //*************************************************
@@ -176,11 +209,8 @@ Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo )
                 oSizeSup:GetDimension("MENSAGEM","YSIZE")-15/*Altura*/,oFont,,,,,.T./*lPixel*/,,,,,,.T./*lReadOnly*/,/*bValid*/,,,.T./*lNoBorder*/,.T./*lVScroll*/)
 
     If ( 'INSERT ' $ cComandoSQL .OR. 'UPDATE ' $ cComandoSQL .OR. ' INTO ' $ cComandoSQL )
-        
-        If At( ";", cSql ) <= 0
-            cSql := cSql + ";"
-        EndIf
-        aSQL:= StrTokArr( strtran(cSql,CRLF," "), ";" ) // troca o ENTER por ESPAÇO para compatibilizar  e depois divide por instruções
+
+        aSQL:= StrTokArr( strtran(cSql,CRLF," "), "#" ) // troca o ENTER por ESPAÇO para compatibilizar  e depois divide por instruções
         Processa({|| cErro := RunSql(aSQL)}," Processando Intruções SQL...")
 
         oMGMensagem:AppendText( "Comando executado " + IIF( Empty( cErro ), "sem", "com" ) + " erro !" )
@@ -284,6 +314,16 @@ Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo )
 
     Else
         oMGMensagem:AppendText( "Comando não permitido !" )
+    EndIf
+
+    nHdl := 0
+    nHdl := FCreate( cArqUser )
+    
+    If nHdl = -1
+        Alert( " Erro na criação do arquivo " )
+    Else
+        FWrite( nHdl, cSqlDigit + CRLF)
+        FClose( nHdl )
     EndIf
 
 Return
