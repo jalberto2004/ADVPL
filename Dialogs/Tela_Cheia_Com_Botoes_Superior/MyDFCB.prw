@@ -79,17 +79,18 @@ Static Function CarregaDados()
                         StrZero( nCont, 6 ),;
                         "Cliente " + StrZero( nCont, 6 ),;
                         "Produto " + StrZero( nCont, 6 ),;
-                        "Data " + DtoC( dDataBase + nCont );
+                        DtoC( dDataBase + nCont );
                          } )
 
     Next
 
-    oBrowse:aHeaders  := {"","Cliente","Produto","Data" }
+    oBrowse:aHeaders  := {"","Sequencial","Cliente","Produto","Data" }
     oBrowse:setArray( aDados )
     oBrowse:bLine := {||{If(aDados[oBrowse:nAt,01],oOK,oNO),;
 								aDados[oBrowse:nAt,02],;
 								aDados[oBrowse:nAt,03],;
-								aDados[oBrowse:nAt,04] } }
+								aDados[oBrowse:nAt,04],;
+								aDados[oBrowse:nAt,05] } }
     oBrowse:bLDblClick := {|| SelLine( oBrowse:nAt )}
     oBrowse:nAt := 1
 
