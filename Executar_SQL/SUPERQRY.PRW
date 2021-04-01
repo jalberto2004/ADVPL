@@ -8,7 +8,7 @@
 /*/{Protheus.doc} SuperQry
 Montar uma tela para a digitação e execução de Comandos SQL ( Select, Update e Insert ).
 @type function
-@version 12.1.25
+@version 12.1.27
 @author Jorge Alberto
 @since 07/09/2020
 /*/
@@ -107,10 +107,10 @@ User Function SuperQry()
     //***********************************************
     //Aqui está criando os Botões/Atalhos das ações
     //***********************************************
-    SetKey( VK_F5, {|| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ) } ) } )
+    SetKey( VK_F5, {|| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ), oMGSql:SetFocus() } ) } )
     TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+10,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
-                    "Executar SQL (F5)",oGgpOpcoes,{|u| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ) } ) },50,12,,,,.T.,,"",,,,.F. )
+                    "Executar SQL (F5)",oGgpOpcoes,{|u| MsgRun( "Executando a consulta...", "Aguarde",  {|| ExecSQL(oPanelResultado, cSQL, @cLogErro, cTipo, oMGSql:nPos ), oMGSql:SetFocus() } ) },50,12,,,,.T.,,"",,,,.F. )
 
 	TComboBox():New( oSizeSup:GetDimension("OPCOES","LININI")+30,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
@@ -118,11 +118,11 @@ User Function SuperQry()
 
     TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+60,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
-                    "Gera Excel",oGgpOpcoes,{|u| MsgRun( "Gerando arquivo...", "Aguarde",  {|| GeraExcel( cSQL, cLogErro ) } ) },35,12,,,,.T.,,"",,,,.F. )
+                    "Gerar Excel",oGgpOpcoes,{|u| MsgRun( "Gerando arquivo...", "Aguarde",  {|| GeraExcel( cSQL, cLogErro, oMGSql:nPos ) } ) },35,12,,,,.T.,,"",,,,.F. )
 
     TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+80,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
-                    "Envia Log",oGgpOpcoes,{|u| MsgRun( "Enviando arquivo...", "Aguarde",  {|| Mysend(cLogErro) } ) },35,12,,,,.T.,,"",,,,.F. )
+                    "Enviar Log",oGgpOpcoes,{|u| MsgRun( "Enviando arquivo...", "Aguarde",  {|| Mysend(cLogErro) } ) },35,12,,,,.T.,,"",,,,.F. )
 
     TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+100,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
@@ -150,16 +150,23 @@ User Function SuperQry()
 Return
 
 
-//********************************
-//Executar os comandos digitados
-//********************************
+/*/{Protheus.doc} ExecSQL
+Executar os comandos digitados
+@type function
+@version 12.1.27
+@author Jorge Alberto
+@since 01/04/2021
+@param oPanelResultado, object, Painel com o resultado
+@param cSql, character, Comando Sql que está na "tela"
+@param cLogErro, character, Variável com o erro na execução
+@param cTipo, character, Qual é o Título que deverá ser gerado
+@param nPosCursor, numeric, Posição do cursos no momento da execução do comando Sql
+/*/
 Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo, nPosCursor )
 
     Local nQueryRet := 0 
     Local nX := 0
     Local nHdl := 0
-    Local nPosIni := 0
-    Local nPosFim := 0
     Local oFont := TFont():New( "Tahoma",0,-14,,.F.,0,,700,.F.,.F.,,,,,, )
     Local cTRB := ""
     Local cSqlDigit := cSql
@@ -178,26 +185,7 @@ Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo, nPosCursor )
         Return
     EndIf
 
-    // Localiza o ; apos a posição do cursor
-    nPosFim := At( ";", cSql, nPosCursor )
-
-    If nPosFim > 0
-
-        // Pega todo o texto desde o inicio ate o ; apos a posição do cursor
-        cSql := SubStr( cSql, 1, nPosFim-1 )
-
-        // Pega a posicao do ULTIMO ; sendo que pode não existir
-        nPosIni := RAt( ";", cSql ) + 1
-
-    // Se não tem o ; apos o cursor, pega o ultimo ; localizado
-    Else
-        nPosIni := RAt( ";", cSql ) + 1
-    EndIf
-
-    If nPosIni > 0
-        // Pega somente o que deve ser executado
-        cSql := SubStr( cSql, nPosIni )
-    EndIf
+    cSql := LimpaSql( cSql, nPosCursor )
 
     //*************************************************
     //Aqui está criando o MultiGet para as Mensagens 
@@ -329,9 +317,15 @@ Static Function ExecSQL(oPanelResultado, cSql, cLogErro, cTipo, nPosCursor )
 Return
 
 
-//***************************************
-//Executar o Insert ou Update digitado
-//***************************************
+/*/{Protheus.doc} RunSql
+Função que efetivamente irá executar o Insert ou Update digitado
+@type function
+@version 12.1.27
+@author Jorge Alberto
+@since 01/04/2021
+@param aSQL, array, Comandos a serem executados
+@return character, Erro na execução do comando SQL
+/*/
 Static Function RunSql( aSQL )
 
     Local nX := 0
@@ -356,11 +350,57 @@ Static Function RunSql( aSQL )
 Return( cErro )
 
 
-//******************************************************************************************************************
-//Gerar um arquivo com os dados localizados e também com o comando SQL executado.
-//Sendo que irá gerar esse arquivo no formato .XLS quando tiver o Excel instalado, OU então cria um arquivo .CSV
-//******************************************************************************************************************
-Static Function GeraExcel( cSql, cLogErro )
+/*/{Protheus.doc} LimpaSql
+Pegar somente o comando SQL que deve ser executado
+@type function
+@version 12.1.27
+@author Jorge Alberto
+@since 01/04/2021
+@param cSql, character, Comando SQL
+@param nPosCursor, numeric, Posição do cursor no momento da chamada da execução
+@return character, Comando SQL que será executado, ou seja, o que estive entre ;
+/*/
+Static Function LimpaSql( cSql, nPosCursor )
+
+    Local nPosIni := 0
+    Local nPosFim := 0
+
+    // Localiza o ; apos a posição do cursor
+    nPosFim := At( ";", cSql, nPosCursor )
+
+    If nPosFim > 0
+
+        // Pega todo o texto desde o inicio ate o ; apos a posição do cursor
+        cSql := SubStr( cSql, 1, nPosFim-1 )
+
+        // Pega a posicao do ULTIMO ; sendo que pode não existir
+        nPosIni := RAt( ";", cSql ) + 1
+
+    // Se não tem o ; apos o cursor, pega o ultimo ; localizado
+    Else
+        nPosIni := RAt( ";", cSql ) + 1
+    EndIf
+
+    If nPosIni > 0
+        // Pega somente o que deve ser executado
+        cSql := SubStr( cSql, nPosIni )
+    EndIf
+
+Return( cSql )
+
+
+/*/{Protheus.doc} GeraExcel
+Gerar um arquivo com os dados localizados e também com o comando SQL executado.
+Sendo que irá gerar esse arquivo no formato .XLS quando tiver o Excel instalado, OU então cria um arquivo .CSV
+@type function
+@version 12.1.27
+@author Jorge Alberto
+@since 01/04/2021
+@param cSql, character, Comando Sql
+@param cLogErro, character, Log com o erro
+@param nPosCursor, numeric, Posição do cursor no momento da chamada da rotina
+/*/
+Static Function GeraExcel( cSql, cLogErro, nPosCursor )
 
     Local nX, nY
     Local nHdr := 0
@@ -385,6 +425,8 @@ Static Function GeraExcel( cSql, cLogErro )
         MsgInfo( "Não é possível gerar o excel com erro !")
         Return
     EndIf
+
+    cSql := LimpaSql( cSql, nPosCursor )
 
     aHeader  := oGridResult:aHeader
     aCols    := oGridResult:aCols
@@ -489,9 +531,14 @@ Static Function GeraExcel( cSql, cLogErro )
 Return
 
 
-//*************************
-//Envia o erro por e-mail
-//*************************
+/*/{Protheus.doc} Mysend
+Enviar o erro por e-mail 
+@type function
+@version 12.1.27
+@author Jorge Alberto
+@since 01/04/2021
+@param cTxt, character, Texto com o erro
+/*/
 Static Function Mysend( cTxt )
     Local lEnvia := .F.
     Static oDlgLog
