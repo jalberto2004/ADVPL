@@ -116,15 +116,19 @@ User Function SuperQry()
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
                     {|u| If(PCount()>0,cTipo:=u,cTipo)},aTipos,040,010,oGgpOpcoes,,,,CLR_BLACK,CLR_WHITE,.T.,,"",,,,,,,cTipo, "Coluna dos dados", 1 )
 
-    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+60,;
+    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+50,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
                     "Gerar Excel",oGgpOpcoes,{|u| MsgRun( "Gerando arquivo...", "Aguarde",  {|| GeraExcel( cSQL, cLogErro, oMGSql:nPos ) } ) },35,12,,,,.T.,,"",,,,.F. )
 
-    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+80,;
+    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+70,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
                     "Enviar Log",oGgpOpcoes,{|u| MsgRun( "Enviando arquivo...", "Aguarde",  {|| Mysend(cLogErro) } ) },35,12,,,,.T.,,"",,,,.F. )
 
-    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+100,;
+    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+90,;
+                    oSizeSup:GetDimension("OPCOES","COLINI")+5,;
+                    "Exp. p/ Fonte ADVPL",oGgpOpcoes,{|u| MsgRun( "Gerando cQuery...", "Aguarde",  {|| CQuery(cSQL, oMGSql:nPos) } ) },55,12,,,,.T.,,"",,,,.F. )
+
+    TButton():New( oSizeSup:GetDimension("OPCOES","LININI")+120,;
                     oSizeSup:GetDimension("OPCOES","COLINI")+5,;
                     "Fechar",oGgpOpcoes,{|u| oDlg:END() },35,12,,,,.T.,,"",,,,.F. )
     
@@ -148,6 +152,127 @@ User Function SuperQry()
     SetKey( VK_F5 , NIL )
 
 Return
+
+
+/*/{Protheus.doc} CQuery
+Função que coloca na área de memória da máquina, toda a consulta no formato cQuery para que fique fácil de colar no código fonte !
+@type function
+@version 12.1.25
+@author Jorge Alberto
+@since 23/04/2021
+@param cSql, character, Comando SQL
+@param nPosCursor, numeric, Posição do cursor na tela
+/*/
+Static Function CQuery( cSql, nPosCursor )
+
+    Local cRet    := ""
+    Local cTab    := ""
+    Local cTxt    := ""
+    Local cFirma  := FWCodEmp()
+    Local nPos    := 0
+    Local nPFil   := 0
+    Local nPEsp   := 0
+    Local nPAspIN := 0
+    Local nPAspFI := 0
+    Local nPPonto := 0
+    Local nPosFim := 0
+
+    If( Empty( cSql ) .Or. nPosCursor <= 0 .Or. !("SELECT" $ Upper( cSql ) ) )
+        Return
+    EndIf
+
+    cRet += "Local cQuery  := ''" + CRLF
+    cRet += "Local cAliTmp := GetNextAlias()" + CRLF + CRLF
+
+    cSql := LimpaSql( cSql, nPosCursor )
+
+    While !Empty( cSql )
+
+        nPos := At( chr(10), cSql )
+        If nPos > 0
+            
+            nPosFim := At( chr(13), cSql, nPos )
+            If nPosFim > 0
+                
+                cTxt := SubStr( cSql, nPos+1, (nPosFim-nPos-1) )
+                If !Empty( cTxt )
+
+                    // Ajusta a Filial
+                    nPFil := At( '_FILIAL', Upper(cTxt) )
+                    If nPFil > 0 .And. nPFil < nPosFim
+                        
+                        cTab := ''
+                        nPPonto := 0
+                        nPEsp := 0
+
+                        // Pega o espaço antes do Alias
+                        For nPEsp := nPFil To nPos Step - 1
+                            If SubStr( cTxt, nPEsp, 1 ) == ' '
+                                Exit
+                            EndIf
+                            // Se tem ponto então tem ALIAS antes do nome do campo/coluna
+                            If SubStr( cTxt, nPEsp, 1 ) == '.'
+                                nPPonto := nPEsp
+                            Endif
+                        Next
+
+                        If nPPonto > 0 .And. nPEsp > 0
+                            cTab := SubStr( cTxt, nPEsp+1, (nPPonto-nPEsp-1) )
+                        Endif
+
+                        nPAspIN := At( "'", cTxt, nPFil ) // aspas simples após a posição da palavra '_FILIAL'
+                        nPAspFI := At( "'", cTxt, nPAspIN ) // aspas simpes que fecha a string da filial
+                        
+                        If nPAspIN > 0 .And. nPAspFI > 0
+                            If Empty( cTab )
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, nPAspFI-1 ), '" + xFilial( ?? ) + "' )
+                            Else
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, nPAspFI-1 ), '" + xFilial( "' + cTab + '" ) + "' + "'" )
+                            Endif
+                        Endif
+                    Endif
+
+                    If ( At( '--', cTxt ) > 0 .Or. At( '/*', cTxt ) > 0 )
+                        cRet += '//cQuery += "' + cTxt + ' "' + CRLF
+                    Else
+                        cRet += 'cQuery += "' + cTxt + ' "' + CRLF
+                    EndIf
+                EndIf
+
+                // Retira o que já foi lido
+                cSql := SubStr( cSql, nPosFim+1 )
+            EndIf
+        EndIf
+        
+        If nPos <= 0 .Or. nPosFim <= 0
+            If Len( cSql ) > 0
+                If At( cSql, cRet ) <= 0
+                    cRet += 'cQuery += "' + cSql + '"' + CRLF
+                Endif
+                cSql := ''
+            Endif
+        Endif
+
+        // Ajusta o nome da tabela
+        nPos := At( cFirma+'0', cRet )
+        If nPos > 0
+            cTab := SubStr( cRet, nPos-3, 6 )
+            // Tabela existe no banco
+            If MSFile(cTab)
+                // Substitui o nome da tabela pela função
+                cRet := Replace( cRet, cTab, '" + RetSqlName( "' + Left(cTab,3) + '" ) + " ' )
+            Endif
+        Endif
+    EndDo
+
+    cRet +=  CRLF + 'DbUseArea(.T.,"TOPCONECT",TcGenQry(,,cQuery),cAliTmp,.F.,.F.)' + CRLF
+
+    CopytoClipboard( cRet )
+    MsgInfo( "Comando copiado para a área de trabalho !!" +CRLF+CRLF+;
+            "Antes de sair do Protheus, abra o código fonte e COLE no local desejado !!" )
+
+Return
+
 
 
 /*/{Protheus.doc} ExecSQL
