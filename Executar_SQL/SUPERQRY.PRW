@@ -197,6 +197,7 @@ Static Function CQuery( cSql, nPosCursor )
                 cTxt := SubStr( cSql, nPos+1, (nPosFim-nPos-1) )
                 If !Empty( cTxt )
 
+                    cTxt := Replace( cTxt, '"', "'" )
                     // Ajusta a Filial
                     nPFil := At( '_FILIAL', Upper(cTxt) )
                     If nPFil > 0 .And. nPFil < nPosFim
@@ -205,9 +206,9 @@ Static Function CQuery( cSql, nPosCursor )
                         nPPonto := 0
                         nPEsp := 0
 
-                        // Pega o espaço antes do Alias
+                        // Pega o espaço/parentese antes do Alias
                         For nPEsp := nPFil To nPos Step - 1
-                            If SubStr( cTxt, nPEsp, 1 ) == ' '
+                            If SubStr( cTxt, nPEsp, 1 ) $ ' /('
                                 Exit
                             EndIf
                             // Se tem ponto então tem ALIAS antes do nome do campo/coluna
@@ -218,16 +219,17 @@ Static Function CQuery( cSql, nPosCursor )
 
                         If nPPonto > 0 .And. nPEsp > 0
                             cTab := SubStr( cTxt, nPEsp+1, (nPPonto-nPEsp-1) )
+                            cTab := FWSX2Util():GetFile( cTab )
                         Endif
 
                         nPAspIN := At( "'", cTxt, nPFil ) // aspas simples após a posição da palavra '_FILIAL'
-                        nPAspFI := At( "'", cTxt, nPAspIN ) // aspas simpes que fecha a string da filial
+                        nPAspFI := At( "'", cTxt, nPAspIN+1 ) // aspas simpes que fecha a string da filial
                         
-                        If nPAspIN > 0 .And. nPAspFI > 0
+                        If( nPAspIN > 0 .And. nPAspFI > 0 .And. nPFil + 15 >= nPAspIN )
                             If Empty( cTab )
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, nPAspFI-1 ), '" + xFilial( ?? ) + "' )
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN-1, (nPAspFI-nPAspIN+1) ), '" + xFilial( ?? ) + "' )
                             Else
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, nPAspFI-1 ), '" + xFilial( "' + cTab + '" ) + "' + "'" )
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN-1, (nPAspFI-nPAspIN+1) ), '" + xFilial( "' + Left( cTab, 3 ) + '" ) + "' + "'" )
                             Endif
                         Endif
                     Endif
@@ -257,8 +259,9 @@ Static Function CQuery( cSql, nPosCursor )
         nPos := At( cFirma+'0', cRet )
         If nPos > 0
             cTab := SubStr( cRet, nPos-3, 6 )
-            // Tabela existe no banco
-            If MSFile(cTab)
+            // Tabela existe no Dicionário de Dados
+            cTab := FWSX2Util():GetFile( cTab )
+            If !Empty( cTab )
                 // Substitui o nome da tabela pela função
                 cRet := Replace( cRet, cTab, '" + RetSqlName( "' + Left(cTab,3) + '" ) + " ' )
             Endif
@@ -266,6 +269,10 @@ Static Function CQuery( cSql, nPosCursor )
     EndDo
 
     cRet +=  CRLF + 'DbUseArea(.T.,"TOPCONECT",TcGenQry(,,cQuery),cAliTmp,.F.,.F.)' + CRLF
+    cRet +=  'While (cAliTmp)->( !EOF() ) ' + CRLF+CRLF
+    cRet +=  '   (cAliTmp)->( DbSkip() ) ' + CRLF
+    cRet +=  'EndDo ' + CRLF
+    cRet +=  '(cAliTmp)->( DbCloseArea() ) ' + CRLF
 
     CopytoClipboard( cRet )
     MsgInfo( "Comando copiado para a área de trabalho !!" +CRLF+CRLF+;
