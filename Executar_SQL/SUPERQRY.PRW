@@ -7,6 +7,8 @@
 
 /*/{Protheus.doc} SuperQry
 Montar uma tela para a digitação e execução de Comandos SQL ( Select, Update e Insert ).
+Com opção de Exporta os resultados para Planilha Eletronica.
+Possibilidade de exportar a consulta para o formato ADVPL que pode ser colado no código fonte.
 @type function
 @version 12.1.27
 @author Jorge Alberto
@@ -165,17 +167,19 @@ Função que coloca na área de memória da máquina, toda a consulta no formato cQue
 /*/
 Static Function CQuery( cSql, nPosCursor )
 
-    Local cRet    := ""
-    Local cTab    := ""
-    Local cTxt    := ""
-    Local cFirma  := FWCodEmp()
-    Local nPos    := 0
-    Local nPFil   := 0
-    Local nPEsp   := 0
-    Local nPAspIN := 0
-    Local nPAspFI := 0
-    Local nPPonto := 0
-    Local nPosFim := 0
+    Local cRet     := ""
+    Local cTab     := ""
+    Local cTxt     := ""
+    Local cFirma   := FWCodEmp()
+    Local aCposSel := {}
+    Local lOk      := .F.
+    Local nPos     := 0
+    Local nPFil    := 0
+    Local nPEsp    := 0
+    Local nPAspIN  := 0
+    Local nPAspFI  := 0
+    Local nPPonto  := 0
+    Local nPosFim  := 0
 
     If( Empty( cSql ) .Or. nPosCursor <= 0 .Or. !("SELECT" $ Upper( cSql ) ) )
         Return
@@ -185,6 +189,15 @@ Static Function CQuery( cSql, nPosCursor )
     cRet += "Local cAliTmp := GetNextAlias()" + CRLF + CRLF
 
     cSql := LimpaSql( cSql, nPosCursor )
+
+    // Pega a estrutura do SQL para adicionar os campos Data e Numérico no TCSetField()
+    If TCSQLEXEC( cSql ) == 0
+        cTab := GetNextAlias()
+        MPSysOpenQuery( cSql, cTab )
+        aCposSel := (cTab)->(DBSTRUCT())
+        (cTab)->( DbCloseArea() )
+        cTab := ""
+    Endif
 
     While !Empty( cSql )
 
@@ -198,6 +211,7 @@ Static Function CQuery( cSql, nPosCursor )
                 If !Empty( cTxt )
 
                     cTxt := Replace( cTxt, '"', "'" )
+
                     // Ajusta a Filial
                     nPFil := At( '_FILIAL', Upper(cTxt) )
                     If nPFil > 0 .And. nPFil < nPosFim
@@ -227,9 +241,9 @@ Static Function CQuery( cSql, nPosCursor )
                         
                         If( nPAspIN > 0 .And. nPAspFI > 0 .And. nPFil + 15 >= nPAspIN )
                             If Empty( cTab )
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN-1, (nPAspFI-nPAspIN+1) ), '" + xFilial( ?? ) + "' )
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( ?? ) + "' )
                             Else
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN-1, (nPAspFI-nPAspIN+1) ), '" + xFilial( "' + Left( cTab, 3 ) + '" ) + "' + "'" )
+                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( "' + Left( cTab, 3 ) + '" ) + "' )
                             Endif
                         Endif
                     Endif
@@ -259,16 +273,40 @@ Static Function CQuery( cSql, nPosCursor )
         nPos := At( cFirma+'0', cRet )
         If nPos > 0
             cTab := SubStr( cRet, nPos-3, 6 )
-            // Tabela existe no Dicionário de Dados
             cTab := FWSX2Util():GetFile( cTab )
             If !Empty( cTab )
-                // Substitui o nome da tabela pela função
                 cRet := Replace( cRet, cTab, '" + RetSqlName( "' + Left(cTab,3) + '" ) + " ' )
             Endif
         Endif
     EndDo
 
     cRet +=  CRLF + 'DbUseArea(.T.,"TOPCONECT",TcGenQry(,,cQuery),cAliTmp,.F.,.F.)' + CRLF
+    
+    For nPos := 1 To Len( aCposSel )
+
+        If AllTrim(aCposSel[ nPos, 1 ]) $ "R_E_C_N_O_/R_E_C_D_E_L_"
+            Loop
+        Endif
+
+        If aCposSel[ nPos, 2 ] $ "D/N"
+            lOk := .T.
+        ElseIf aCposSel[ nPos, 3 ] == 8 // Campo pode ser Data mesmo vindo como C no DBSTRUCT()
+
+            If FWSX3Util():GetFieldType( aCposSel[ nPos, 1 ] )  == "D"
+                lOk := .T.
+                aCposSel[ nPos, 2 ] := "D"
+            EndIf
+        EndIf
+
+        If lOk
+            cRet +=  'TCSetField( cAliTmp, "' + aCposSel[ nPos, 1 ] + '", "' + aCposSel[ nPos, 2 ] + '", ' + cValToChar(aCposSel[ nPos, 3 ]) + ', ' + cValToChar(aCposSel[ nPos, 4 ]) + ' )' + CRLF
+            If aCposSel[ nPos, 2 ] == "N"
+                cRet +=  '// c' + AllTrim( Replace( aCposSel[ nPos, 1 ], "_", "" ) ) + 'Picture := "' + AllTrim(X3Picture( aCposSel[ nPos, 1 ] )) + '"' + CRLF
+            Endif
+        Endif
+        lOk := .F.
+    Next
+
     cRet +=  'While (cAliTmp)->( !EOF() ) ' + CRLF+CRLF
     cRet +=  '   (cAliTmp)->( DbSkip() ) ' + CRLF
     cRet +=  'EndDo ' + CRLF
@@ -279,6 +317,7 @@ Static Function CQuery( cSql, nPosCursor )
             "Antes de sair do Protheus, abra o código fonte e COLE no local desejado !!" )
 
 Return
+
 
 
 
