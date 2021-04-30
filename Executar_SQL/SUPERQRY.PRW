@@ -171,15 +171,11 @@ Static Function CQuery( cSql, nPosCursor )
     Local cTab     := ""
     Local cTxt     := ""
     Local cFirma   := FWCodEmp()
+    Local aQry     := {}
     Local aCposSel := {}
     Local lOk      := .F.
+    Local nX       := 0
     Local nPos     := 0
-    Local nPFil    := 0
-    Local nPEsp    := 0
-    Local nPAspIN  := 0
-    Local nPAspFI  := 0
-    Local nPPonto  := 0
-    Local nPosFim  := 0
 
     If( Empty( cSql ) .Or. nPosCursor <= 0 .Or. !("SELECT" $ Upper( cSql ) ) )
         Return
@@ -190,7 +186,7 @@ Static Function CQuery( cSql, nPosCursor )
 
     cSql := LimpaSql( cSql, nPosCursor )
 
-    // Pega a estrutura do SQL para adicionar os campos Data e Numérico no TCSetField()
+    //Pega a estrutura do SQL para adicionar os campos Data e Numérico no TCSetField()
     If TCSQLEXEC( cSql ) == 0
         cTab := GetNextAlias()
         MPSysOpenQuery( cSql, cTab )
@@ -199,86 +195,71 @@ Static Function CQuery( cSql, nPosCursor )
         cTab := ""
     Endif
 
-    While !Empty( cSql )
+    aQry := StrTokArr(cSql, CRLF)
 
-        nPos := At( chr(10), cSql )
-        If nPos > 0
-            
-            nPosFim := At( chr(13), cSql, nPos )
-            If nPosFim > 0
+    For nX:= 1 To Len(aQry)
+        cTxt := aQry[nX]
+        If ! Empty(cTxt)
+
+            cTxt := Replace( cTxt, '"', "'" )
+
+            // Ajusta a Filial
+            nPFil := At( '_FILIAL', Upper(cTxt) )
+            If nPFil > 0
                 
-                cTxt := SubStr( cSql, nPos+1, (nPosFim-nPos-1) )
-                If !Empty( cTxt )
+                cTab := ''
+                nPPonto := 0
+                nPEsp := 0
 
-                    cTxt := Replace( cTxt, '"', "'" )
-
-                    // Ajusta a Filial
-                    nPFil := At( '_FILIAL', Upper(cTxt) )
-                    If nPFil > 0 .And. nPFil < nPosFim
-                        
-                        cTab := ''
-                        nPPonto := 0
-                        nPEsp := 0
-
-                        // Pega o espaço/parentese antes do Alias
-                        For nPEsp := nPFil To nPos Step - 1
-                            If SubStr( cTxt, nPEsp, 1 ) $ ' /('
-                                Exit
-                            EndIf
-                            // Se tem ponto então tem ALIAS antes do nome do campo/coluna
-                            If SubStr( cTxt, nPEsp, 1 ) == '.'
-                                nPPonto := nPEsp
-                            Endif
-                        Next
-
-                        If nPPonto > 0 .And. nPEsp > 0
-                            cTab := SubStr( cTxt, nPEsp+1, (nPPonto-nPEsp-1) )
-                            cTab := FWSX2Util():GetFile( cTab )
-                        Endif
-
-                        nPAspIN := At( "'", cTxt, nPFil ) // aspas simples após a posição da palavra '_FILIAL'
-                        nPAspFI := At( "'", cTxt, nPAspIN+1 ) // aspas simpes que fecha a string da filial
-                        
-                        If( nPAspIN > 0 .And. nPAspFI > 0 .And. nPFil + 15 >= nPAspIN )
-                            If Empty( cTab )
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( ?? ) + "' )
-                            Else
-                                cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( "' + Left( cTab, 3 ) + '" ) + "' )
-                            Endif
-                        Endif
-                    Endif
-
-                    If ( At( '--', cTxt ) > 0 .Or. At( '/*', cTxt ) > 0 )
-                        cRet += '//cQuery += "' + cTxt + ' "' + CRLF
-                    Else
-                        cRet += 'cQuery += "' + cTxt + ' "' + CRLF
+                // Pega o espaço/parentese antes do Alias
+                For nPEsp := nPFil To 1 Step - 1
+                    If SubStr( cTxt, nPEsp, 1 ) $ ' /('
+                        Exit
                     EndIf
-                EndIf
+                    // Se tem ponto então tem ALIAS antes do nome do campo/coluna
+                    If SubStr( cTxt, nPEsp, 1 ) == '.' .And. nPPonto == 0
+                        nPPonto := nPEsp
+                    Endif
+                Next
 
-                // Retira o que já foi lido
-                cSql := SubStr( cSql, nPosFim+1 )
-            EndIf
-        EndIf
-        
-        If nPos <= 0 .Or. nPosFim <= 0
-            If Len( cSql ) > 0
-                If At( cSql, cRet ) <= 0
-                    cRet += 'cQuery += "' + cSql + '"' + CRLF
+                If nPPonto > 0 .And. nPEsp > 0
+                    cTab := SubStr( cTxt, nPEsp+1, (nPPonto-nPEsp-1) )
+                    If !Empty( cTab )
+                        cTab := FWSX2Util():GetFile( cTab )
+                    Endif
                 Endif
-                cSql := ''
-            Endif
-        Endif
 
-        // Ajusta o nome da tabela
-        nPos := At( cFirma+'0', cRet )
-        If nPos > 0
-            cTab := SubStr( cRet, nPos-3, 6 )
-            cTab := FWSX2Util():GetFile( cTab )
-            If !Empty( cTab )
-                cRet := Replace( cRet, cTab, '" + RetSqlName( "' + Left(cTab,3) + '" ) + " ' )
+                nPAspIN := At( "'", cTxt, nPFil ) // aspas simples após a posição da palavra '_FILIAL'
+                nPAspFI := At( "'", cTxt, nPAspIN+1 ) // aspas simpes que fecha a string da filial
+                
+                If( nPAspIN > 0 .And. nPAspFI > 0 .And. nPFil + 15 >= nPAspIN )
+                    If Empty( cTab )
+                        cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( ?? ) + "' )
+                    Else
+                        cTxt := Replace( cTxt, SubStr( cTxt, nPAspIN+1, (nPAspFI-nPAspIN-1) ), '" + xFilial( "' + Left( cTab, 3 ) + '" ) + "' )
+                    Endif
+                Endif
             Endif
-        Endif
-    EndDo
+            
+            // Ajusta o nome da tabela
+            nPos := At( cFirma+'0', cTxt )
+            If nPos > 0
+                cTab := SubStr( cTxt, nPos-3, 6 )
+                cTab := FWSX2Util():GetFile( cTab )
+                If !Empty( cTab )
+                    cTxt := Replace( cTxt, cTab, '" + RetSqlName( "' + Left(cTab,3) + '" ) + " ' )
+                Endif
+            Endif
+
+            If ( At( '--', cTxt ) > 0 .Or. At( '/*', cTxt ) > 0 )
+                cRet += '//cQuery += "' + cTxt + ' "' + CRLF
+            Else
+                cRet += 'cQuery += "' + cTxt + ' "' + CRLF
+            EndIf
+
+        EndIf
+    Next
+
 
     cRet +=  CRLF + 'DbUseArea(.T.,"TOPCONECT",TcGenQry(,,cQuery),cAliTmp,.F.,.F.)' + CRLF
     
@@ -311,6 +292,7 @@ Static Function CQuery( cSql, nPosCursor )
     cRet +=  '   (cAliTmp)->( DbSkip() ) ' + CRLF
     cRet +=  'EndDo ' + CRLF
     cRet +=  '(cAliTmp)->( DbCloseArea() ) ' + CRLF
+
 
     CopytoClipboard( cRet )
     MsgInfo( "Comando copiado para a área de trabalho !!" +CRLF+CRLF+;
@@ -635,7 +617,7 @@ Static Function GeraExcel( cSql, cLogErro, nPosCursor )
 
         For nX := 1 to Len(aCols)
             aLinha := {}
-            For nY := 1 to LEN(aCols[nX])
+            For nY := 1 to LEN(aCols[nX])-1
                 AADD(aLinha, aCols[nX][nY])
             Next nY
             oFWMsExcel:AddRow(cAba01,cTitTabela01,aLinha)
