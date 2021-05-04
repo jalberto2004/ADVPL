@@ -517,6 +517,7 @@ Static Function LimpaSql( cSql, nPosCursor )
 
     Local nPosIni := 0
     Local nPosFim := 0
+    Local nPosCom := 0
 
     // Localiza o ; apos a posição do cursor
     nPosFim := At( ";", cSql, nPosCursor )
@@ -538,6 +539,27 @@ Static Function LimpaSql( cSql, nPosCursor )
         // Pega somente o que deve ser executado
         cSql := SubStr( cSql, nPosIni )
     EndIf
+
+    nPosCom := At( '--', cSql )
+    If nPosCom <= 0
+        nPosCom := At( '/*', cSql )
+    Endif
+
+    // Retira a linha comentada no início do código
+    If nPosCom > 0
+        nPosIni := At( "SELECT ", Upper(cSql) )
+        If nPosIni <= 0
+            nPosIni := At( "UPDATE ", Upper(cSql) )
+            If nPosIni <= 0
+                nPosIni := At( "INSERT ", Upper(cSql) )
+            Endif
+        Endif
+
+        // Comentário antes do comando "inicial" de qualquer instrução SQL permitida
+        If nPosCom < nPosIni
+            cSql := SubStr( cSql, nPosIni )
+        Endif
+    Endif
 
 Return( cSql )
 
