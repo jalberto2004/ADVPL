@@ -282,7 +282,7 @@ Static Function CQuery( cSql, nPosCursor )
         If lOk
             cRet +=  'TCSetField( cAliTmp, "' + aCposSel[ nPos, 1 ] + '", "' + aCposSel[ nPos, 2 ] + '", ' + cValToChar(aCposSel[ nPos, 3 ]) + ', ' + cValToChar(aCposSel[ nPos, 4 ]) + ' )' + CRLF
             If aCposSel[ nPos, 2 ] == "N"
-                cRet +=  '// c' + AllTrim( Replace( aCposSel[ nPos, 1 ], "_", "" ) ) + 'Picture := "' + AllTrim(X3Picture( aCposSel[ nPos, 1 ] )) + '"' + CRLF
+                cRet +=  '// c' + AllTrim( Replace( aCposSel[ nPos, 1 ], "_", "" ) ) + 'Picture := X3Picture( "' + aCposSel[ nPos, 1 ] + '" ) ' + CRLF
             Endif
         Endif
         lOk := .F.
