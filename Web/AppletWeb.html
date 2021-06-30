@@ -1,0 +1,307 @@
+<HTML>
+    <HEAD>
+        <STYLE>      
+            .a
+            {
+                border: 2px solid black;
+                border-collapse:collapse;
+            }
+        </STYLE>
+
+        <SCRIPT type="text/javascript">
+            var dedos        = new Array(10);
+            var appdevice    = '';
+            var appoperation = '';
+            var apptypeauth  = '';
+
+            for(i=0;i<10;i++)
+                dedos[i] = '';
+
+            function definirDepuracao()
+            {
+                document.bioapp.SetDebug(document.TotvsBioForm.Debug.checked);
+            }
+            
+            function obterTipoAutenticacao()
+            {
+                for( i = 0; i < document.TotvsBioForm.TypeAuth.length; i++ )
+                {
+                    if( document.TotvsBioForm.TypeAuth[i].checked == true )
+                        return document.TotvsBioForm.TypeAuth[i].value;
+                }
+                
+                return '1';
+            }
+
+            function obterIndiceDedo()
+            {
+                for( i = 0; i < document.TotvsBioForm.dedos.length; i++ )
+                {
+                    if (document.TotvsBioForm.dedos[i].checked == true)
+                        return i;
+                }
+                
+                return 0;
+            }
+
+            function dedoFoiDigitalizado()
+            {
+                if (dedos[obterIndiceDedo()].length == 0)
+                {
+                    alert("Esta digital não foi armazenado ainda")
+                    return false;
+                }
+
+                return true;
+            }
+
+            function Capturar()
+            {
+                definirDepuracao();
+                
+                appoperation = "1";
+                appdevice = "NITGEN";
+                apptypeauth  = obterTipoAutenticacao();
+                document.TotvsBioForm.digital.value = "";
+                document.bioapp.ConfigCb('parametrosExecucao');
+                document.bioapp.SetCbError('mostrarErro');
+                document.bioapp.CaptureCb('retornoCapturar');
+                document.bioapp.TotvsBioStart();
+            }
+
+            function retornoCapturar(digital)
+            {
+                var i = obterIndiceDedo();
+                dedos[i] = digital;
+                document.TotvsBioForm.digital.value = digital;
+                document.getElementById('D' + i).style.fontStyle = 'italic';
+                document.getElementById('D' + i).style.backgroundColor = '#00FF00';
+                document.getElementById('I' + i).style.backgroundColor = '#00FF00';
+            }
+            
+            function capturarVerificar(fase)
+            {
+                if (fase == 0)
+                {
+                    if (!dedoFoiDigitalizado())
+                        return;
+            
+                    definirDepuracao();
+                
+                    appoperation = "2";
+                    appdevice = "NITGEN";
+                    apptypeauth  = obterTipoAutenticacao();
+                    document.TotvsBioForm.digital.value = "";
+                    document.bioapp.ConfigCb('parametrosExecucao');
+                    document.bioapp.SetCbError('mostrarErro');
+                    document.bioapp.VerifyCb('retornoCapturarVerificar');
+                    document.bioapp.TotvsBioStart();
+                }
+                else
+                    Autenticar();
+            }
+            
+            function retornoCapturarVerificar(digital)
+            {
+                document.TotvsBioForm.digital.value = digital;
+                setTimeout("capturarVerificar(1)",200);
+            }
+            
+            function Autenticar()
+            {
+                if (!dedoFoiDigitalizado())
+                    return;
+                    
+                if (document.TotvsBioForm.digital.value.length == 0)
+                {
+                    alert("A digital para verificação não foi capturada")
+                    return false;
+                }                    
+            
+                definirDepuracao();
+                
+                appoperation = "3";
+                appdevice = "NITGEN";
+                apptypeauth  = obterTipoAutenticacao();
+                document.bioapp.ConfigCb('parametrosExecucao');
+                document.bioapp.SetCbError('mostrarErro');
+                document.bioapp.VerifyMatchFpCb('parametrosAutenticacao');
+                document.bioapp.VerifyMatchCb('retornoAutenticar');
+                document.bioapp.TotvsBioStart();
+            }
+
+            function parametrosAutenticacao()
+            {
+                var digital = new Array(4);
+                
+            //  O tipo de codificação da digital é sempre 'Z' pois, no exemplo
+            //  não existem digitais sem codificação: 'N'.
+                
+                digital[0] = 'Z';
+                digital[1] = document.TotvsBioForm.digital.value;
+
+                digital[2] = 'Z';
+                digital[3] = dedos[obterIndiceDedo()];
+
+                return digital;
+            }
+
+            function retornoAutenticar(sResult)
+            {
+                if (sResult == "1")
+                    alert("A digital foi reconhecida");
+                else
+                    if (sResult == "0")
+                        alert("A digital não foi reconhecida");
+                    else
+                        alert("Resultado da autenticação" + sResult);
+            }
+
+            function mostrarErro(mensagem)
+            {
+                alert(mensagem);
+            }
+
+            function parametrosExecucao()
+            {
+                var aConfig = new Array(3);
+                aConfig[0] = appdevice;
+                aConfig[1] = appoperation;
+                aConfig[2] = apptypeauth;
+                return aConfig;
+            }
+            // JAVASCRIPT -> Funcoes de Callback
+        </SCRIPT>
+
+    </HEAD>
+    <BODY>
+        <B>HTML</B>
+
+        <form name="TotvsBioForm" method="post" action="">
+            <!--action="http://127.0.0.1:8080/PHP/src/Totvsbio.php">-->
+            <hr>
+            <table>
+                <tr>
+                    <TD>
+                        <TABLE class='a'>
+                            <tr>
+                                <TH>Depuração</TH>
+                            </tr>
+                            <tr>
+                                <TD>
+                                    <TABLE>
+                                        <tr>
+                                            <TD><input type="checkbox" name="Debug" value="1" onclick="definirDepuracao();" checked>Ativar</TD>
+                                        </tr>
+                                    </TABLE>
+                                </TD>
+                            </tr>
+                        </table>
+                    </TD>
+                    <TD>&nbsp;&nbsp;&nbsp</TD>
+                    <TD>
+                        <TABLE class='a'>
+                            <tr>
+                                <th>
+                                    <B>Tipo de autenticação:</B>
+                                </th>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <table>
+                                        <tr>
+                                            <td><input type="radio" name="TypeAuth" value="1" checked>Proprietária Nitgen ou<td>
+                                            <td><input type="radio" name="TypeAuth" value="35">ANSI<td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </TD>
+                </tr>
+            </table>
+            <br>
+            <table>
+                <tr>
+                    <TD>
+                        <TABLE class='a'>
+                            <tr>
+                                <TH>Mão esquerda</TH>
+                            </tr>
+                            <tr>
+                                <TD>
+                                    <TABLE>
+                                        <tr>
+                                            <TD ID="D0"><input id="I0" type="radio" name="dedos" value="0">Mindinho</TD>
+                                            <TD ID="D1"><input id="I1" type="radio" name="dedos" value="1">Anular</TD>
+                                            <TD ID="D2"><input id="I2" type="radio" name="dedos" value="2">Médio</TD>
+                                            <TD ID="D3"><input id="I3" type="radio" name="dedos" value="3">Indicador</TD>
+                                            <TD ID="D4"><input id="I4" type="radio" name="dedos" value="4" checked>Polegar</TD>
+                                        </tr>
+                                    </TABLE>
+                                </TD>
+                            </tr>
+                        </table>
+                    </TD>
+                    <TD>&nbsp;&nbsp;&nbsp
+                    </TD>
+                    <TD>
+						<!--
+                        <TABLE class='a'>
+                            <tr>
+                                <TH>Mão direita</TH>
+                            </tr>
+                            <tr>
+                                <TD>
+                                    <TABLE>
+                                        <tr>
+                                            <TD ID="D5"><input id="I5" type="radio" name="dedos" value="5">Polegar</TD>
+                                            <TD ID="D6"><input id="I6" type="radio" name="dedos" value="6">Indicador</TD>
+                                            <TD ID="D7"><input id="I7" type="radio" name="dedos" value="7">Médio</TD>
+                                            <TD ID="D8"><input id="I8" type="radio" name="dedos" value="8">Anular</TD>
+                                            <TD ID="D9"><input id="I9" type="radio" name="dedos" value="9">Mindinho</TD>
+                                        </tr>
+                                    </TABLE>
+                                </TD>
+                            </tr>
+                        </table>
+						-->
+                    </TD>
+                </tr>
+            </table>
+            <hr>
+            <B>Operação:</B><br>
+            <TABLE>
+                <tr>
+                    <TD>
+                        <TABLE>
+                            <tr>
+                                <TD><input type="button" onClick="Capturar()" value="Capturar e armazenar" title="Captura e armazena a digital"></TD>
+                                <TD><input type="button" onClick="capturarVerificar(0)" value="Capturar e autenticar" title="Captura e verifica contra a digital selecionada"></TD>
+                                <TD><input type="button" onClick="Autenticar()" value="autenticar" title="Verifica a digital capturada contra uma armazenada"></TD>
+                            </tr>
+                        </TABLE>
+                    </TD>
+                </tr>
+            </table>
+            <hr>
+            <textarea name="digital" rows="8" cols="95"></textarea>
+        </form>
+
+        <SCRIPT type="text/javascript">
+            document.write("<div>navigator.platform:" + navigator.platform + "</div>");
+            document.write("<div>navigator.userAgent:" + navigator.userAgent + "</div>");
+            
+//            document.write("<applet height='50' width='50' NAME='bioapp' code='com.bio.BioApplet.class' archive='sBioApplet.jar'>");
+//            document.write("Applet failed to run.  No Java plug-in was found.");
+//            document.write("</applet>");
+            
+            document.write("<object type='application/x-java-applet' height='50' width='50' NAME='bioapp'>");
+            document.write("<param name='code' value='com.bio.BioApplet.class' />");
+            document.write("<param name='archive' value='sBioApplet.jar' />"); 
+            document.write("Applet failed to run.  No Java plug-in was found.");
+            document.write("</object>");
+
+        </SCRIPT>
+    </BODY>
+</HTML>
