@@ -1,2 +1,2 @@
 # ADVPL
-Fontes desenvolvidos utilizando a linguagem AdvPL com intuito de auxiliar e ajudar outros desenvolvedores.
+Fontes desenvolvidos utilizando a linguagem AdvPL com intuito de ajudar outros desenvolvedores.
